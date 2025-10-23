@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Models\LaporanTindakanPerawat;
-use App\Models\TindakanWaktu;
 use App\Models\RecordAnalisaData;
+use App\Models\TindakanWaktu;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class LaporanController extends Controller
@@ -15,12 +16,13 @@ class LaporanController extends Controller
     /**
      * Get hospital working hours with null handling and default value
      *
-     * @param int $default Default value if hospital data is not available
+     * @param  int  $default  Default value if hospital data is not available
      * @return int
      */
     private function getHospitalWorkingHours($default = 2000)
     {
         $hospital = \App\Models\Hospital::first();
+
         return $hospital ? ($hospital->waktu_kerja_tersedia ?? $default) : $default;
     }
 
@@ -40,10 +42,12 @@ class LaporanController extends Controller
             $laporan->delete();
             // Mengambil data laporan tindakan perawat beserta relasinya
             $laporan = LaporanTindakanPerawat::with(['user', 'ruangan', 'shift', 'tindakan'])->orderBy('tanggal', 'desc')->get();
+
             return view('pages.laporan-hasil', compact('laporan'))->with('message', 'Laporan deleted successfully.');
         }
         // Mengambil data laporan tindakan perawat beserta relasinya
         $laporan = LaporanTindakanPerawat::with(['user', 'ruangan', 'shift', 'tindakan'])->orderBy('tanggal', 'desc')->get();
+
         return view('pages.laporan-hasil', compact('laporan'))->withErrors(['message' => 'Laporan not found.']);
     }
 
@@ -61,7 +65,7 @@ class LaporanController extends Controller
 
         // Jika pengguna memilih tanggal, filter berdasarkan rentang tanggal
         if ($tanggalAwal && $tanggalAkhir) {
-            $query->whereBetween('tanggal', [$tanggalAwal . " 00:00:00", $tanggalAkhir . " 23:59:59"]);
+            $query->whereBetween('tanggal', [$tanggalAwal.' 00:00:00', $tanggalAkhir.' 23:59:59']);
         }
 
         // Ambil data laporan yang telah difilter
@@ -129,7 +133,7 @@ class LaporanController extends Controller
 
         // Terapkan filter berdasarkan rentang tanggal jika tersedia
         if ($tanggalAwal && $tanggalAkhir) {
-            $query->whereBetween('tanggal', [$tanggalAwal . " 00:00:00", $tanggalAkhir . " 23:59:59"]);
+            $query->whereBetween('tanggal', [$tanggalAwal.' 00:00:00', $tanggalAkhir.' 23:59:59']);
         }
 
         // Ambil data laporan yang telah difilter
@@ -205,6 +209,7 @@ class LaporanController extends Controller
                 // Hitung jumlah tindakan per perawat dan per tindakan
                 $tindakanJumlah[$laporan->tindakan_id] = $perawatLaporan->where('tindakan_id', $laporan->tindakan_id)->count();
             }
+
             return $tindakanJumlah;
         });
 
@@ -248,6 +253,7 @@ class LaporanController extends Controller
 
         return view('pages.laporan-tambahan', compact('laporan', 'tindakanLainLain', 'perawatTindakan', 'rataRataWaktu', 'swl'));
     }
+
     public function index5(Request $request)
     {
         // Query untuk mengambil laporan dengan status "Tambahan"
@@ -262,7 +268,7 @@ class LaporanController extends Controller
 
         // Terapkan filter berdasarkan rentang tanggal jika tersedia
         if ($tanggalAwal && $tanggalAkhir) {
-            $query->whereBetween('tanggal', [$tanggalAwal . " 00:00:00", $tanggalAkhir . " 23:59:59"]);
+            $query->whereBetween('tanggal', [$tanggalAwal.' 00:00:00', $tanggalAkhir.' 23:59:59']);
         }
 
         // Ambil data laporan yang telah difilter
@@ -320,24 +326,24 @@ class LaporanController extends Controller
         //     'rataRataWaktu', 'swl', 'totalTindakan', 'tanggalAwal', 'tanggalAkhir'
         // ));
         return view('pages.laporan-tambahan', compact(
-            'tindakanTambahan',  'tanggalAwal', 'tanggalAkhir', 'hospitalTime'
+            'tindakanTambahan', 'tanggalAwal', 'tanggalAkhir', 'hospitalTime'
         ));
     }
-
 
     public function index6(Request $request)
     {
         // Ambil semua user perawat untuk dropdown
-        $users = LaporanTindakanPerawat::with('user')->get()->pluck('user')->unique('id');
+        $users = User::whereHas('laporanTindakan')->select(['id', 'nama_lengkap'])->get()->sortBy('nama_lengkap');
 
         // Ambil user_id dari request jika ada (user yang dipilih)
         $selectedUserId = $request->input('user_id');
 
         // Ambil laporan berdasarkan user_id yang dipilih
-        $laporan = LaporanTindakanPerawat::with(['tindakan'])
-            ->when($selectedUserId, function ($query) use ($selectedUserId) {
-                $query->where('user_id', $selectedUserId);
-            })
+        // Optimized version
+        $laporan = LaporanTindakanPerawat::with('tindakan:id,tindakan,status') // Specify columns
+            ->when($selectedUserId, fn ($query) => $query->where('user_id', $selectedUserId))
+            ->select('id', 'tindakan_id', 'user_id', 'tanggal', 'durasi', 'keterangan', 'nama_pasien') // Select only needed columns
+            ->latest('id') // Add ordering
             ->get();
 
         // Menghitung jumlah tindakan per jenis tindakan
@@ -372,29 +378,28 @@ class LaporanController extends Controller
         // group tindakan by status
         $tindakanGrouped = $laporan->groupBy('tindakan.status');
 
-        $tindakanPokok = LaporanTindakanPerawat::with(['tindakan'])
-            ->when($selectedUserId, function ($query) use ($selectedUserId) {
-                $query->where('user_id', $selectedUserId);
-            })
-            ->whereHas('tindakan', function ($q) {
-                $q->where('status', 'Tugas Pokok');
-            })->get();
+        $tindakanPokok = LaporanTindakanPerawat::with('tindakan:id,tindakan,status,waktu') // Specify columns
+            ->when($selectedUserId, fn ($query) => $query->where('user_id', $selectedUserId))
+            ->whereHas('tindakan', fn ($q) => $q->where('status', 'Tugas Pokok'))
+            ->select('id', 'tindakan_id', 'user_id', 'tanggal', 'durasi', 'keterangan', 'nama_pasien')
+            ->get();
 
         // dd($tindakanPokok);
         // Menghitung rata-rata waktu per tindakan
         $rataRataWaktu = [];
+        // Optimized version
         $tindakanPokok = TindakanWaktu::where('status', 'Tugas Pokok')
             ->whereHas('laporanTindakan', function ($query) use ($selectedUserId) {
-            if ($selectedUserId) {
-                $query->where('user_id', $selectedUserId);
-            }
+                $query->when($selectedUserId, fn ($q) => $q->where('user_id', $selectedUserId));
             })
-            ->with(['laporanTindakan' => function ($query) use ($selectedUserId) {
-            if ($selectedUserId) {
-                $query->where('user_id', $selectedUserId);
-            }
-            $query->with('user');
-            }])
+            ->with([
+                'laporanTindakan' => function ($query) use ($selectedUserId) {
+                    $query->when($selectedUserId, fn ($q) => $q->where('user_id', $selectedUserId))
+                        ->select('id', 'tindakan_id', 'user_id', 'tanggal', 'durasi') // Specify columns
+                        ->with('user:id,nama_lengkap'); // Optimize nested relationship
+                },
+            ])
+            ->select('id', 'tindakan', 'status') // Select only needed columns
             ->get();
 
         foreach ($tindakanPokok as $tindakan) {
@@ -408,7 +413,8 @@ class LaporanController extends Controller
         return view('pages.laporan-perawat', compact('users', 'selectedUserId', 'rataRataWaktu', 'swl', 'laporan', 'tindakanGrouped', 'tindakanPokok'));
     }
 
-    public function index7(Request $request) {
+    public function index7(Request $request)
+    {
         return view('pages.laporan-beban');
     }
 
@@ -438,7 +444,7 @@ class LaporanController extends Controller
                 // Mengembalikan data yang sudah diformat
                 return [
                     'tanggal' => $jamBerhenti ? $jamBerhenti->format('Y-m-d') : '-',
-                    'durasi' => $item->durasi ? round($item->durasi / 60, 2) . ' menit' : '0 menit',
+                    'durasi' => $item->durasi ? round($item->durasi / 60, 2).' menit' : '0 menit',
                     'keterangan' => $item->keterangan ?? '-',
                     'shift' => $shiftName, // Mengirim nama shift
                     'jam_mulai' => $jamMulai ? $jamMulai->format('H:i:s') : '-',
@@ -451,11 +457,13 @@ class LaporanController extends Controller
         } catch (\Exception $e) {
             // Menangani error dan menulisnya ke log
             Log::error('Error detailTindakan:', ['error' => $e->getMessage()]);
+
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
 
-    public function analisaData($userId, Request $request) {
+    public function analisaData($userId, Request $request)
+    {
         try {
             $tanggalAwal = $request->query('tanggalAwal');
             $tanggalAkhir = $request->query('tanggalAkhir');
@@ -464,17 +472,17 @@ class LaporanController extends Controller
             $selectedUserId = $userId;
 
             $laporanQuery = LaporanTindakanPerawat::with(['tindakan'])
-            ->when($selectedUserId, function ($query) use ($selectedUserId) {
-                $query->where('user_id', $selectedUserId);
-            });
+                ->when($selectedUserId, function ($query) use ($selectedUserId) {
+                    $query->where('user_id', $selectedUserId);
+                });
             $laporanQueryPokok = LaporanTindakanPerawat::with(['tindakan'])
-            ->when($selectedUserId, function ($query) use ($selectedUserId) {
-                $query->where('user_id', $selectedUserId);
-            });
+                ->when($selectedUserId, function ($query) use ($selectedUserId) {
+                    $query->where('user_id', $selectedUserId);
+                });
             $laporanQueryTambahan = LaporanTindakanPerawat::with(['tindakan'])
-            ->when($selectedUserId, function ($query) use ($selectedUserId) {
-                $query->where('user_id', $selectedUserId);
-            });
+                ->when($selectedUserId, function ($query) use ($selectedUserId) {
+                    $query->where('user_id', $selectedUserId);
+                });
 
             // Query untuk mengambil laporan dengan status "Tugas Penunjang"
             $query = $laporanQuery
@@ -490,12 +498,11 @@ class LaporanController extends Controller
                     $q->where('status', 'tambahan');
                 });
 
-
             // Terapkan filter berdasarkan rentang tanggal jika tersedia
             if ($tanggalAwal && $tanggalAkhir) {
-                $query->whereBetween('tanggal', [$tanggalAwal . " 00:00:00", $tanggalAkhir . " 23:59:59"]);
-                $queryPokok->whereBetween('tanggal', [$tanggalAwal . " 00:00:00", $tanggalAkhir . " 23:59:59"]);
-                $queryTambahan->whereBetween('tanggal', [$tanggalAwal . " 00:00:00", $tanggalAkhir . " 23:59:59"]);
+                $query->whereBetween('tanggal', [$tanggalAwal.' 00:00:00', $tanggalAkhir.' 23:59:59']);
+                $queryPokok->whereBetween('tanggal', [$tanggalAwal.' 00:00:00', $tanggalAkhir.' 23:59:59']);
+                $queryTambahan->whereBetween('tanggal', [$tanggalAwal.' 00:00:00', $tanggalAkhir.' 23:59:59']);
             }
 
             // Ambil data laporan yang telah difilter
@@ -515,8 +522,6 @@ class LaporanController extends Controller
 
             // Ambil data rumah sakit
             $hospitalTime = $this->getHospitalWorkingHours();
-
-
 
             // Hitung jumlah tindakan per tindakan dan per perawat
             $perawatTindakan = [];
@@ -547,15 +552,12 @@ class LaporanController extends Controller
                 $rataRataWaktu[$tindakan->id] = $jumlahTindakan > 0 ? ($totalDurasi / $jumlahTindakan) / 60 : 0;
             }
 
-
-
             // Menghitung standar workload (SWL)
             $swl = [];
             $jamTersediaPerTahun = 2000;
             foreach ($rataRataWaktu as $tindakanId => $rataWaktu) {
                 $swl[$tindakanId] = $rataWaktu > 0 ? $jamTersediaPerTahun / ($rataWaktu / 60) : 0;
             }
-
 
             // Mulai hitung AF
             $totalWaktu = 0;
@@ -571,11 +573,11 @@ class LaporanController extends Controller
                 } else {
                     $waktuJam = 0; // Jika satuan tidak dikenali
                 }
-                if($tindakan->satuan == 'jam') {
+                if ($tindakan->satuan == 'jam') {
                     $totalWaktu = $tindakan->waktu * 1;
-                } elseif($tindakan->satuan == 'menit') {
+                } elseif ($tindakan->satuan == 'menit') {
                     $totalWaktu = $tindakan->waktu / 60;
-                } elseif($tindakan->satuan == 'hari') {
+                } elseif ($tindakan->satuan == 'hari') {
                     $totalWaktu = $tindakan->waktu * 24;
                 }
                 if ($tindakan->kategori == 'harian') {
@@ -593,14 +595,10 @@ class LaporanController extends Controller
                 $totalFaktor += $faktor;
             }
 
-
-
-
             // Menghitung rata-rata faktor
             $totalTindakanForFaktor = count($tindakanPenunjang);
             $averageFaktor = $totalTindakanForFaktor > 0 ? $totalFaktor / $totalTindakanForFaktor : 0;
             $averageFaktor = number_format($averageFaktor, 2);
-
 
             $hospitalTime = $this->getHospitalWorkingHours();
             $jamTersediaPerTahun = $hospitalTime; // Total jam kerja per tahun
@@ -608,7 +606,7 @@ class LaporanController extends Controller
             // $rataWaktu = $tindakan->waktu > 0 ? ($tindakan->waktu / $tindakan->count()) : 0;
             // $swl = $rataWaktu > 0 ? $jamTersediaPerTahun / ($rataWaktu / 60) : 0;
 
-            $AF = number_format(1 / (1 - ($averageFaktor/100)), 2);
+            $AF = number_format(1 / (1 - ($averageFaktor / 100)), 2);
 
             // $tindakanPokok = $laporanQuery
             //     ->whereHas('tindakan', function ($q) {
@@ -644,8 +642,6 @@ class LaporanController extends Controller
                 $totalHasil += number_format(($totalJamTindakan * $frequency), 2);
             }
 
-
-
             // $tindakanTambahan = $laporanQuery
             //     ->whereHas('tindakan', function ($q) {
             //         $q->where('status', 'tambahan');
@@ -657,10 +653,10 @@ class LaporanController extends Controller
                 $namaTindakan = $tindakan->tindakan->tindakan ?? 'Tidak Ada Data';
                 $durasi = $tindakan->durasi ?? 0;
 
-                if (!isset($totalTindakan[$namaTindakan])) {
+                if (! isset($totalTindakan[$namaTindakan])) {
                     $totalTindakan[$namaTindakan] = [
                         'frequency' => 0,
-                        'durasi' => 0
+                        'durasi' => 0,
                     ];
                 }
                 $totalTindakan[$namaTindakan]['frequency']++;
@@ -674,8 +670,6 @@ class LaporanController extends Controller
             }
 
             $IAF = $totalWaktuTambahan / $hospitalTime; // Menghitung IAF (Indeks Aktivitas Fungsional)
-
-
 
             $result = (($totalHasil * $AF) / $hospitalTime) + $IAF;
 
@@ -723,10 +717,10 @@ class LaporanController extends Controller
         } catch (\Exception $e) {
             // Menangani error dan menulisnya ke log
             Log::error('Error detailTindakan:', ['error' => $e->getMessage()]);
+
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
-
 
     public function analisaDataSemua(Request $request)
     {
@@ -738,8 +732,8 @@ class LaporanController extends Controller
             $laporanQuery = LaporanTindakanPerawat::with(['tindakan', 'user']);
             if ($tanggalAwal && $tanggalAkhir) {
                 $laporanQuery->whereBetween('tanggal', [
-                    $tanggalAwal . " 00:00:00",
-                    $tanggalAkhir . " 23:59:59"
+                    $tanggalAwal.' 00:00:00',
+                    $tanggalAkhir.' 23:59:59',
                 ]);
             }
             $semuaLaporan = $laporanQuery->get();
@@ -757,8 +751,8 @@ class LaporanController extends Controller
 
                 // Pisahkan berdasarkan status
                 $laporanPenunjang = $laporanUser->where('tindakan.status', 'Tugas Penunjang');
-                $laporanPokok     = $laporanUser->where('tindakan.status', 'Tugas Pokok');
-                $laporanTambahan  = $laporanUser->where('tindakan.status', 'tambahan');
+                $laporanPokok = $laporanUser->where('tindakan.status', 'Tugas Pokok');
+                $laporanTambahan = $laporanUser->where('tindakan.status', 'tambahan');
 
                 // Data rumah sakit
                 $hospitalTime = $this->getHospitalWorkingHours();
@@ -830,10 +824,10 @@ class LaporanController extends Controller
                     $namaTindakan = $tindakan->tindakan->tindakan ?? 'Tidak Ada Data';
                     $durasi = $tindakan->durasi ?? 0;
 
-                    if (!isset($totalTindakanTambahan[$namaTindakan])) {
+                    if (! isset($totalTindakanTambahan[$namaTindakan])) {
                         $totalTindakanTambahan[$namaTindakan] = [
                             'frequency' => 0,
-                            'durasi' => 0
+                            'durasi' => 0,
                         ];
                     }
                     $totalTindakanTambahan[$namaTindakan]['frequency']++;
@@ -865,18 +859,18 @@ class LaporanController extends Controller
                     'AF' => $AF,
                     'IAF' => $IAF,
                     'result' => $result,
-                    'averageFaktor' => $averageFaktor
+                    'averageFaktor' => $averageFaktor,
                 ];
             }
 
             return response()->json([
                 'status' => 'success',
-                'data' => $hasilAnalisa
+                'data' => $hasilAnalisa,
             ]);
         } catch (\Exception $e) {
             Log::error('Error analisaDataSemua:', ['error' => $e->getMessage()]);
+
             return response()->json(['message' => $e->getMessage()], 500);
         }
     }
-
 }
