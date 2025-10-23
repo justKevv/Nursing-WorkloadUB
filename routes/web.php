@@ -19,9 +19,9 @@ Route::post('/register', [LoginController::class, 'register']);
 
 Route::middleware(['auth'])->group(function () {
     // Route untuk dashboard admin
-   
 
-    
+
+
 });
 
 Route::get('/', function () {
@@ -45,7 +45,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')
         Route::delete('/master-user/delete/{id}', [MasterController::class, 'deleteUser'])->name('admin.master.user.delete');
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
         Route::get('/master-tindakan', [MasterController::class, 'masterTindakan'])->name('admin.master-tindakan');
         Route::post('/master-tindakan/store', [MasterController::class, 'storeTindakan'])->name('admin.master.tindakan.store');
         Route::delete('/master-tindakan/delete/{id}', [MasterController::class, 'deleteTindakan'])->name('admin.master.tindakan.delete');
@@ -53,7 +53,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')
         Route::put('/master-tindakan/update/{id}', [MasterController::class, 'updateTindakan'])->name('admin.master.tindakan.update');
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
         Route::get('/master-shift', [MasterController::class, 'masterShiftKerja'])->name('admin.master-shiftkerja');
         Route::post('/master-shift-kerja/store', [MasterController::class, 'storeShiftKerja'])->name('admin.master.shiftkerja.store');
         Route::delete('/master-shift-kerja/delete/{id}', [MasterController::class, 'deleteShiftKerja'])->name('admin.master.shiftkerja.delete');
@@ -62,12 +62,12 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')
         Route::get('/master-work-status', [MasterController::class, 'masterWorkStatus'])->name('admin.master-work-status');
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
         Route::get('/master-ruangan', [MasterController::class, 'masterRuangan'])->name('admin.master-ruangan');
         Route::post('/ruangan/store', [MasterController::class, 'storeRuangan'])->name('master.ruangan.store');
         Route::delete('/ruangan/delete/{id}', [MasterController::class, 'deleteRuangan'])->name('master.ruangan.delete');
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
         Route::get('/master-keamanan-privasi', [MasterController::class, 'masterKeamananPrivasi'])->name('admin.master-keamanan-privasi');
         Route::get('/master-panduan', [MasterController::class, 'masterPanduan'])->name('admin.master-panduan');
 
@@ -76,10 +76,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')
         Route::delete('/laporan/delete/{id}', [LaporanController::class, 'deleteLaporan'])->name('admin.laporan.delete');
 
         // tugas pokok
-        Route::get('/laporan2', 
-        [LaporanController::class, 'index2'])->name('admin.laporan.index2');
+        Route::get('/laporan2', [LaporanController::class, 'index2'])->name('admin.laporan.index2');
 
-        
+
         Route::get('/laporan3', [LaporanController::class, 'index3'])->name('admin.laporan.index3');
         Route::get('/laporan4', [LaporanController::class, 'index4'])->name('admin.laporan.index4');
         Route::get('/laporan5', [LaporanController::class, 'index5'])->name('admin.laporan.index5');
@@ -107,7 +106,7 @@ Route::middleware(['auth', 'role:perawat'])->prefix('perawat')
         Route::get('/home', [PerawatController::class, 'home'])->name('home');
 
         /////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
         Route::get('/timer', [PerawatController::class, 'timer'])->name('timer');
         // Route::post('/start-action', [PerawatController::class, 'startAction'])->name('start-action');
         Route::post('/stop-action', [PerawatController::class, 'stopAction'])->name('stop-action');
@@ -120,7 +119,7 @@ Route::middleware(['auth', 'role:perawat'])->prefix('perawat')
         Route::post('/tindakan/store-tambahan', [PerawatController::class, 'storeTindakanTambahan'])->name('tindakan.storeTambahan');
         Route::post('/tindakan/store-pokok', [PerawatController::class, 'storeTindakanPokok'])->name('tindakan.storePokok');
         Route::get('/tindakan', [PerawatController::class, 'tindakan'])->name('tindakan');
-        
+
         // TINDKAN TAMBAHAN
         Route::get('/tindakan-tambahan', [PerawatController::class, 'tindakanTambahan'])->name('tindakan.tambahan');
         //////////////////////////////////////////////////////////////////////
@@ -131,7 +130,7 @@ Route::middleware(['auth', 'role:perawat'])->prefix('perawat')
         Route::get('/profil-password', [PerawatController::class, 'profilPassword'])->name('profil.password');
         Route::post('/profil-password-store', [PerawatController::class, 'profilPasswordStore'])->name('profil.password.store');
         //////////////////////////////////////////////////////////////////////
-    
+
         // Menambahkan route baru
         // Menampilkan form ubah password
         Route::get('/ubahpassword', [PerawatController::class, 'showUbahPasswordForm'])->name('ubahpassword');
@@ -149,7 +148,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\SessionsController;
-            
+
 
 // Route::get('/', function () {return redirect('sign-in');})->middleware('guest');
 // Route::get('/dashboard', [DashboardController::class, 'index'])->middleware('auth')->name('dashboard');
@@ -161,7 +160,7 @@ Route::post('verify', [SessionsController::class, 'show'])->middleware('guest');
 Route::post('reset-password', [SessionsController::class, 'update'])->middleware('guest')->name('password.update');
 Route::get('verify', function () {
 	return view('sessions.password.verify');
-})->middleware('guest')->name('verify'); 
+})->middleware('guest')->name('verify');
 Route::get('/reset-password/{token}', function ($token) {
 	return view('sessions.password.reset', ['token' => $token]);
 })->middleware('guest')->name('password.reset');

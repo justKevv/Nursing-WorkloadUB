@@ -27,7 +27,7 @@ class LaporanController extends Controller
     public function index()
     {
         // Mengambil data laporan tindakan perawat beserta relasinya
-        $laporan = LaporanTindakanPerawat::with(['user', 'ruangan', 'shift', 'tindakan'])->orderBy('id','desc')->get();
+        $laporan = LaporanTindakanPerawat::select('id', 'user_id', 'ruangan_id', 'shift_id', 'tindakan_id', 'tanggal', 'durasi', 'keterangan', 'nama_pasien')->with(['user:id,nama_lengkap', 'ruangan:id,nama_ruangan', 'shift:id,nama_shift', 'tindakan:id,tindakan,status'])->latest('id')->get();
 
         // Jika sudah benar, kembalikan ke view
         return view('pages.laporan-hasil', compact('laporan'));
