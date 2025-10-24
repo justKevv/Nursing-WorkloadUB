@@ -36,7 +36,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             <div class="col-12 col-md-6 button-datatable"></div>
                                         </form>
                                     </div>
@@ -60,26 +60,13 @@
                                                 <th
                                                     class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
                                                     SWL</th>
-                                                
+
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            
+
                                             @foreach($tindakanPokok as $tindakan)
                                             <tr>
-                                                @foreach($tindakan->laporanTindakan as $perawatItem)
-                                                    @php
-                                                        // Kelompokkan laporan berdasarkan user_id
-                                                        $grouped = $tindakan->laporanTindakan->groupBy('user_id');
-
-                                                        // Total jam semua laporan untuk tindakan ini
-                                                        $totalJamTindakan = collect($tindakan->laporanTindakan)->sum(function ($laporan) {
-                                                            $mulai = \Carbon\Carbon::parse($laporan->jam_mulai);
-                                                            $berhenti = \Carbon\Carbon::parse($laporan->jam_berhenti);
-                                                            return $mulai->floatDiffInHours($berhenti);
-                                                        });
-                                                    @endphp
-                                                @endforeach
                                                 <td class="text-center pb-auto text-sm">
                                                     <button class="btn btn-success btn-sm" data-bs-toggle="collapse"
                                                         data-bs-target="#collapse{{ $tindakan->id }}" aria-expanded="false"
@@ -94,15 +81,12 @@
                                                     @if ($tindakan->laporanTindakan->count() > 0)
                                                     <div class="collapse" id="collapse{{ $tindakan->id }}">
                                                         <span style="display:block; margin-top:2px;"></span>
-                                                        @if (!collect($grouped)->isEmpty())
-                                                            @foreach($grouped as $userId => $laporanGroup)
-                                                                @php
-                                                                    $user = $laporanGroup->first()->user;
-                                                                @endphp
-                                                                <p class="my-2">{{ $user->nama_lengkap ?? 'Tidak Ada Data' }}</p>
-                                                            @endforeach
-                                                            
-                                                        @endif
+                                                        @foreach($tindakan->grouped_laporan as $userId => $laporanGroup)
+                                                            @php
+                                                                $user = $laporanGroup->first()->user;
+                                                            @endphp
+                                                            <p class="my-2">{{ $user->nama_lengkap ?? 'Tidak Ada Data' }}</p>
+                                                        @endforeach
                                                     </div>
                                                     @endif
                                                 </td>
@@ -111,39 +95,23 @@
                                                     @if ($tindakan->laporanTindakan->count() > 0)
                                                         <div class="collapse" id="collapse{{ $tindakan->id }}">
                                                             <span style="display:block; margin-top:2px;"></span>
-                                                            @if (!collect($grouped)->isEmpty())
-                                                                @foreach($grouped as $userId => $laporanGroup)
-                                                                    @php
-                                                                        $user = $laporanGroup->first()->user;
-                                                                    @endphp
-                                                                    <p class="text-center my-2">{{ $laporanGroup->count() }}</p>
-                                                                @endforeach
-                                                                
-                                                            @endif
+                                                            @foreach($tindakan->frekuensi_per_user as $userId => $count)
+                                                                <p class="text-center my-2">{{ $count }}</p>
+                                                            @endforeach
                                                         </div>
                                                     @endif
                                                 </td>
                                                 <td class="align-middle text-center text-md">
                                                     @if ($tindakan->laporanTindakan->count() > 0)
-                                                        <strong class="text-info">{{ number_format($totalJamTindakan, 3) }}</strong>
+                                                        <strong class="text-info">{{ number_format($tindakan->total_jam_tindakan, 3) }}</strong>
                                                     @else
                                                         <strong>0</strong>
                                                     @endif
 
                                                     @if ($tindakan->laporanTindakan->count() > 0)
-                                                        
                                                         <div class="collapse" id="collapse{{ $tindakan->id }}">
                                                             <span style="display:block; margin-top:2px;"></span>
-
-                                                            @foreach ($grouped as $nama => $items)
-                                                                @php
-                                                                    $totalJam = $items->sum(function ($laporan) {
-                                                                        $mulai = \Carbon\Carbon::parse($laporan->jam_mulai);
-                                                                        $berhenti = \Carbon\Carbon::parse($laporan->jam_berhenti);
-                                                                        return $mulai->floatDiffInHours($berhenti); // Menghasilkan dalam satuan jam desimal
-                                                                    });
-                                                                @endphp
-
+                                                            @foreach ($tindakan->jam_per_user as $userId => $totalJam)
                                                                 <p class="text-center my-2">{{ number_format($totalJam, 3) }}</p>
                                                             @endforeach
                                                         </div>
@@ -151,17 +119,14 @@
                                                 </td>
                                                 <td class="align-middle text-center text-sm text-danger">
                                                     @if ($tindakan->laporanTindakan->count() > 0)
-                                                        <strong>{{ number_format($totalJamTindakan/$tindakan->laporanTindakan->count(), 3) }}</strong>
+                                                        <strong>{{ number_format($tindakan->swl, 3) }}</strong>
                                                     @else
                                                         <strong>0</strong>
                                                     @endif
                                                 </td>
-                                                @php
-                                                    $grouped = [];
-                                                @endphp
                                             </tr>
                                             @endforeach
-                                            
+
                                         </tbody>
                                     </table>
                                 </div>

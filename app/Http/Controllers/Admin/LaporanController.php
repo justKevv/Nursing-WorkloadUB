@@ -53,70 +53,54 @@ class LaporanController extends Controller
 
     public function index2(Request $request)
     {
-        // Query dasar untuk mengambil laporan dengan status "Tugas Pokok"
-        $query = LaporanTindakanPerawat::with(['user', 'tindakan'])
-            ->whereHas('tindakan', function ($q) {
-                $q->where('status', 'Tugas Pokok');
-            });
-
         // Ambil input tanggal dari request
-        $tanggalAwal = $request->input('tanggal_awal');
-        $tanggalAkhir = $request->input('tanggal_akhir');
+        $tanggalAwal = $request->input('start_date');
+        $tanggalAkhir = $request->input('end_date');
 
-        // Jika pengguna memilih tanggal, filter berdasarkan rentang tanggal
-        if ($tanggalAwal && $tanggalAkhir) {
-            $query->whereBetween('tanggal', [$tanggalAwal.' 00:00:00', $tanggalAkhir.' 23:59:59']);
-        }
+        // Query untuk tindakan dengan status "Tugas Pokok" dan eager load laporan yang sudah difilter
+        $tindakanPokokQuery = TindakanWaktu::where('status', 'Tugas Pokok')
+            ->with(['laporanTindakan' => function ($query) use ($tanggalAwal, $tanggalAkhir) {
+                // Filter laporan berdasarkan tanggal jika ada
+                if ($tanggalAwal && $tanggalAkhir) {
+                    $query->whereBetween('tanggal', [$tanggalAwal.' 00:00:00', $tanggalAkhir.' 23:59:59']);
+                }
+                $query->with('user:id,nama_lengkap'); // Eager load user dengan selected columns
+            }]);
 
-        // Ambil data laporan yang telah difilter
-        $laporan = $query->get();
+        $tindakanPokok = $tindakanPokokQuery->get();
 
-        // Ambil daftar perawat yang memiliki tindakan "Tugas Pokok"
-        $perawat = $laporan->pluck('user')->unique('id');
+        // Pre-calculate data untuk setiap tindakan
+        $tindakanPokok->each(function ($tindakan) {
+            // Group laporan by user_id
+            $tindakan->grouped_laporan = $tindakan->laporanTindakan->groupBy('user_id');
+            
+            // Calculate total jam untuk semua laporan tindakan ini
+            $tindakan->total_jam_tindakan = $tindakan->laporanTindakan->sum(function ($laporan) {
+                $mulai = \Carbon\Carbon::parse($laporan->jam_mulai);
+                $berhenti = \Carbon\Carbon::parse($laporan->jam_berhenti);
+                return $mulai->floatDiffInHours($berhenti);
+            });
+            
+            // Calculate total jam per user
+            $tindakan->jam_per_user = $tindakan->grouped_laporan->map(function ($laporanGroup) {
+                return $laporanGroup->sum(function ($laporan) {
+                    $mulai = \Carbon\Carbon::parse($laporan->jam_mulai);
+                    $berhenti = \Carbon\Carbon::parse($laporan->jam_berhenti);
+                    return $mulai->floatDiffInHours($berhenti);
+                });
+            });
+            
+            // Calculate frekuensi per user
+            $tindakan->frekuensi_per_user = $tindakan->grouped_laporan->map(function ($laporanGroup) {
+                return $laporanGroup->count();
+            });
+            
+            // Calculate SWL
+            $totalCount = $tindakan->laporanTindakan->count();
+            $tindakan->swl = $totalCount > 0 ? ($tindakan->total_jam_tindakan / $totalCount) : 0;
+        });
 
-        // Ambil daftar tindakan yang memiliki status "Tugas Pokok"
-        $tindakanPokok = $laporan->pluck('tindakan')->unique('id');
-
-        // Hitung jumlah tindakan per tindakan dan per perawat
-        $perawatTindakan = [];
-        foreach ($perawat as $perawatItem) {
-            foreach ($tindakanPokok as $tindakan) {
-                $perawatTindakan[$perawatItem->id][$tindakan->id] = $laporan
-                    ->where('user_id', $perawatItem->id)
-                    ->where('tindakan_id', $tindakan->id)
-                    ->count();
-            }
-        }
-
-        // Hitung total tindakan untuk setiap jenis tindakan
-        $totalTindakan = [];
-        foreach ($tindakanPokok as $tindakan) {
-            $totalTindakan[$tindakan->id] = $laporan->where('tindakan_id', $tindakan->id)->count();
-        }
-
-        // Menghitung rata-rata waktu per tindakan
-        $rataRataWaktu = [];
-        $tindakanPokok = TindakanWaktu::where('status', 'Tugas Pokok')->with(['laporanTindakan.user'])->get();
-
-        foreach ($tindakanPokok as $tindakan) {
-            $laporanTindakan = $laporan->where('tindakan_id', $tindakan->id);
-            $totalDurasi = $laporanTindakan->sum('durasi');
-            $jumlahTindakan = $laporanTindakan->count();
-
-            $rataRataWaktu[$tindakan->id] = $jumlahTindakan > 0 ? ($totalDurasi / $jumlahTindakan) / 60 : 0;
-        }
-
-        // Menghitung standar workload (SWL)
-        $swl = [];
-        $jamTersediaPerTahun = 2000;
-        foreach ($rataRataWaktu as $tindakanId => $rataWaktu) {
-            $swl[$tindakanId] = $rataWaktu > 0 ? $jamTersediaPerTahun / ($rataWaktu / 60) : 0;
-        }
-
-        return view('pages.laporan-pokok', compact(
-            'perawat', 'perawatTindakan', 'tindakanPokok', 'laporan',
-            'rataRataWaktu', 'swl', 'totalTindakan', 'tanggalAwal', 'tanggalAkhir'
-        ));
+        return view('pages.laporan-pokok', compact('tindakanPokok', 'tanggalAwal', 'tanggalAkhir'));
     }
 
     public function index3(Request $request)
