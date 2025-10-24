@@ -214,7 +214,7 @@
 
                                     <!-- Action Buttons -->
                                     <div class="mt-4 text-center">
-                                        <p class="text-black">Sedang dihitung:</p> 
+                                        <p class="text-black">Sedang dihitung:</p>
                                         <p id="current-tindakan" class="fw-bold text-primary"> - </p>
                                     </div>
                                     <div class="mt-4 text-center">
@@ -244,23 +244,8 @@
                             <div class="card-body px-3 pb-2">
                                 <section class="container my-1">
                                     <h5 class="card-title text-center mb-3">Pilih Jenis Tindakan Pokok</h5>
-                                    <form action="{{ route('perawat.tindakan.storePokok') }}" method="POST">
+                                    <form action="{{ route('perawat.tindakan.storePokok') }}" method="POST" id="formTindakanPokok">
                                         @csrf
-                                        <div class="mb-3 input-group input-group-outline">
-                                            <div class="mt-4">
-                                                <h5>Pilih Jenis Tindakan</h5>
-                                                <div class="form-group">
-                                                    <select class="form-control tindakan-select2" id="tindakanSelect2" name="tindakan_id">
-                                                        <option value="" disabled selected>Pilih Tindakan</option>
-                                                        @foreach ($tindakanWaktu as $tindakan)
-                                                            <option value="{{ $tindakan->id }}">
-                                                                {{ $tindakan->tindakan }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
 
                                         <input type="hidden" name="waktu" value="0">
                                         <input type="hidden" name="status" value="Tugas Pokok">
@@ -269,14 +254,39 @@
                                             <label for="tanggal">Tanggal</label>
                                             <input type="date" class="form-control" name="tanggal" required>
                                         </div>
-                                        <div class="mb-3 input-group input-group-static">
-                                            <label for="jam_mulai" >Jam Mulai</label>
-                                            <input type="time" class="form-control" name="jam_mulai" placeholder="" required>
+
+                                        <div class="mb-3">
+                                            <h5>Pilih Jenis Tindakan</h5>
+                                            <div id="tindakanRowsContainer">
+                                                <div class="tindakan-row mb-3">
+                                                    <div class="d-flex align-items-end gap-2">
+                                                        <div class="flex-grow-1">
+                                                            <label class="form-label">Tindakan</label>
+                                                            <select class="form-control tindakan-select2-dynamic" name="tindakan_id[]" required>
+                                                                <option value="" disabled selected>Pilih Tindakan</option>
+                                                                @foreach ($tindakanWaktu as $tindakan)
+                                                                    <option value="{{ $tindakan->id }}">
+                                                                        {{ $tindakan->tindakan }}
+                                                                    </option>
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
+                                                        <div style="width: 150px;">
+                                                            <label class="form-label">Jam Mulai</label>
+                                                            <input type="time" class="form-control" name="jam_mulai[]" required>
+                                                        </div>
+                                                        <div style="width: 150px;">
+                                                            <label class="form-label">Jam Berhenti</label>
+                                                            <input type="time" class="form-control" name="jam_berhenti[]" required>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="btn btn-success btn-sm" id="addTindakanRowBtn">
+                                                <i class="material-icons" style="font-size: 16px; vertical-align: middle;">add</i> Tambah Tindakan Lain
+                                            </button>
                                         </div>
-                                        <div class="mb-3 input-group input-group-static">
-                                            <label for="jam_berhenti" >Jam Berhenti</label>
-                                            <input type="time" class="form-control" name="jam_berhenti" placeholder="" required>
-                                        </div>
+
                                         <div class="mb-3 input-group input-group-static">
                                             <label for="nama_pasien">Nama Pasien/No. RM</label>
                                             <input type="text" class="form-control" name="nama_pasien" placeholder="(opsional)">
@@ -285,7 +295,7 @@
                                             <label for="keterangan">Keterangan</label>
                                             <input type="text" class="form-control" name="keterangan" placeholder="(opsional)">
                                         </div>
-                                        <button type="submit" class="btn btn-primary w-100">Simpan Tindakan</button>
+                                        <button type="submit" class="btn btn-primary w-100">Simpan Semua Tindakan</button>
                                     </form>
                                 </section>
                             </div>
@@ -313,6 +323,63 @@
                     allowClear: true,
                     width: 'resolve',
                     dropdownCssClass: "custom-select2-dropdown"
+                });
+
+                // Initialize Select2 for dynamic tindakan rows
+                $('.tindakan-select2-dynamic').select2({
+                    placeholder: "Pilih tindakan",
+                    allowClear: true,
+                    width: '100%',
+                    dropdownCssClass: "custom-select2-dropdown"
+                });
+
+                // Add new tindakan row
+                $('#addTindakanRowBtn').on('click', function() {
+                    const newRow = `
+                        <div class="tindakan-row mb-3">
+                            <div class="d-flex align-items-end gap-2">
+                                <div class="flex-grow-1">
+                                    <label class="form-label">Tindakan</label>
+                                    <select class="form-control tindakan-select2-dynamic" name="tindakan_id[]" required>
+                                        <option value="" disabled selected>Pilih Tindakan</option>
+                                        @foreach ($tindakanWaktu as $tindakan)
+                                            <option value="{{ $tindakan->id }}">
+                                                {{ $tindakan->tindakan }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div style="width: 150px;">
+                                    <label class="form-label">Jam Mulai</label>
+                                    <input type="time" class="form-control" name="jam_mulai[]" required>
+                                </div>
+                                <div style="width: 150px;">
+                                    <label class="form-label">Jam Berhenti</label>
+                                    <input type="time" class="form-control" name="jam_berhenti[]" required>
+                                </div>
+                                <button type="button" class="btn btn-danger btn-sm remove-tindakan-row" style="height: 38px;">
+                                    <i class="material-icons" style="font-size: 16px; pointer-events: none;">delete</i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+
+                    $('#tindakanRowsContainer').append(newRow);
+
+                    // Initialize Select2 for the new dropdown
+                    $('#tindakanRowsContainer .tindakan-select2-dynamic').last().select2({
+                        placeholder: "Pilih tindakan",
+                        allowClear: true,
+                        width: '100%',
+                        dropdownCssClass: "custom-select2-dropdown"
+                    });
+                });
+
+                // Remove tindakan row
+                $(document).on('click', '.remove-tindakan-row', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    $(this).closest('.tindakan-row').remove();
                 });
             });
 
@@ -366,7 +433,7 @@
                 // let timerInterval;
                 // let elapsedTime = 0; // Pindahkan ke luar agar bisa diakses di stopButton
 
-                let isRunning = false; 
+                let isRunning = false;
                 let startTime = null;
                 let timerInterval;
                 let elapsedTime = 0;

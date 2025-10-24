@@ -494,53 +494,80 @@ class PerawatController extends Controller
 
     public function storeTindakanPokok(Request $request)
     {
-
+        // Validate array inputs for multiple tindakan
         $validated = $request->validate([
-            'tindakan_id' => 'required|exists:tindakan_waktu,id',
-            // 'nama_pasien' => 'required|string',
-            // 'keterangan' => 'required|string',
-            // 'shift_id' => 'required|exists:shift_kerja,id',
+            'tindakan_id' => 'required|array',
+            'tindakan_id.*' => 'required|exists:tindakan_waktu,id',
+            'jam_mulai' => 'required|array',
+            'jam_mulai.*' => 'required',
+            'jam_berhenti' => 'required|array',
+            'jam_berhenti.*' => 'required',
+            'tanggal' => 'required|date',
+            'nama_pasien' => 'nullable|string',
+            'keterangan' => 'nullable|string',
         ]);
 
+        $tanggal = $request->input('tanggal');
+        $tindakanIds = $request->input('tindakan_id');
+        $jamMulaiArray = $request->input('jam_mulai');
+        $jamBerhentiArray = $request->input('jam_berhenti');
+        $namaPasien = $request->input('nama_pasien'); // Shared field
+        $keterangan = $request->input('keterangan'); // Shared field
 
-        // Ambil waktu yang diinputkan
-        // $waktu = $request->input('waktu');
+        $successCount = 0;
+        $errorMessages = [];
 
-        // Gunakan getShiftByJamMulai untuk mendapatkan shift berdasarkan jam_mulai yang dimasukkan
-        $jamMulaiInput = Carbon::parse($request->input('jam_mulai'))->format('H:i'); // Ambil jam mulai saat ini
-        $shiftId = $this->getShiftByJamMulai($jamMulaiInput);
+        // Loop through each tindakan entry
+        foreach ($tindakanIds as $index => $tindakanId) {
+            try {
+                // Get shift based on jam_mulai for this specific tindakan
+                $jamMulaiInput = Carbon::parse($jamMulaiArray[$index])->format('H:i');
+                $shiftId = $this->getShiftByJamMulai($jamMulaiInput);
 
-        // Pastikan shift ditemukan
-        if (!$shiftId) {
-            session()->flash('error', 'Shift tidak ditemukan untuk waktu sekarang.');
-            dd('Shift tidak ditemukan untuk waktu sekarang.');
-            return redirect()->back();
+                // Check if shift was found
+                if (!$shiftId) {
+                    $errorMessages[] = "Shift tidak ditemukan untuk tindakan " . ($index + 1) . " pada waktu " . $jamMulaiInput;
+                    continue;
+                }
+
+                // Create datetime objects with date
+                $jamMulai = Carbon::parse($tanggal . ' ' . $jamMulaiArray[$index] . ':00');
+                $jamBerhenti = Carbon::parse($tanggal . ' ' . $jamBerhentiArray[$index] . ':00');
+
+                // Calculate duration in seconds
+                $durasi = Carbon::parse($jamMulai)->diffInSeconds($jamBerhenti);
+
+                // Create laporan entry with shared nama_pasien and keterangan
+                LaporanTindakanPerawat::create([
+                    'user_id' => auth()->user()->id,
+                    'ruangan_id' => auth()->user()->ruangan_id,
+                    'shift_id' => $shiftId,
+                    'tindakan_id' => $tindakanId,
+                    'tanggal' => $tanggal,
+                    'jam_mulai' => $jamMulai,
+                    'jam_berhenti' => $jamBerhenti,
+                    'nama_pasien' => $namaPasien ?? null,
+                    'keterangan' => $keterangan ?? null,
+                    'durasi' => $durasi,
+                ]);
+
+                $successCount++;
+            } catch (\Exception $e) {
+                $errorMessages[] = "Gagal menyimpan tindakan " . ($index + 1) . ": " . $e->getMessage();
+            }
         }
 
+        // Set appropriate flash message
+        if ($successCount > 0) {
+            if (count($errorMessages) > 0) {
+                session()->flash('warning', $successCount . ' tindakan berhasil ditambahkan. ' . implode(' ', $errorMessages));
+            } else {
+                session()->flash('success', $successCount . ' tindakan pokok berhasil ditambahkan.');
+            }
+        } else {
+            session()->flash('error', 'Tidak ada tindakan yang berhasil ditambahkan. ' . implode(' ', $errorMessages));
+        }
 
-        // Menambahkan tanggal pada jam_mulai dan jam_berhenti
-        $tanggal = $request->input('tanggal');
-        $jamMulai = Carbon::parse($tanggal . ' ' . $request->input('jam_mulai') . ':00');
-        $jamBerhenti = Carbon::parse($tanggal . ' ' . $request->input('jam_berhenti') . ':00');
-
-        // Hitung durasi dalam detik (selisih antara jam_berhenti dan jam_mulai)
-        $durasi = Carbon::parse($jamMulai)->diffInSeconds($jamBerhenti);
-
-
-        $laporan = LaporanTindakanPerawat::create([
-            'user_id' => auth()->user()->id,
-            'ruangan_id' => auth()->user()->ruangan_id,
-            'shift_id' => $shiftId,
-            'tindakan_id' => $validated['tindakan_id'],
-            'tanggal' => $tanggal,
-            'jam_mulai' => $jamMulai,
-            'jam_berhenti' => $jamBerhenti,
-            'nama_pasien' => $request->input('nama_pasien') ?? null,
-            'keterangan' => $request->input('keterangan') ?? null,
-            'durasi' => $durasi,
-        ]);
-
-        session()->flash('success', 'Tindakan pokok berhasil ditambahkan.');
         return redirect()->route('perawat.hasil');
     }
 
