@@ -29,7 +29,7 @@ class LaporanController extends Controller
     public function index()
     {
         // Mengambil data laporan tindakan perawat beserta relasinya
-        $laporan = LaporanTindakanPerawat::select('id', 'user_id', 'ruangan_id', 'shift_id', 'tindakan_id', 'tanggal', 'durasi', 'keterangan', 'nama_pasien')->with(['user:id,nama_lengkap', 'ruangan:id,nama_ruangan', 'shift:id,nama_shift', 'tindakan:id,tindakan,status'])->latest('id')->get();
+        $laporan = LaporanTindakanPerawat::select('id', 'user_id', 'ruangan_id', 'shift_id', 'tindakan_id', 'tanggal', 'durasi', 'keterangan', 'nama_pasien', 'jam_mulai', 'jam_berhenti')->with(['user:id,nama_lengkap', 'ruangan:id,nama_ruangan', 'shift:id,nama_shift', 'tindakan:id,tindakan,status'])->latest('id')->get();
 
         // Jika sudah benar, kembalikan ke view
         return view('pages.laporan-hasil', compact('laporan'));
@@ -73,14 +73,14 @@ class LaporanController extends Controller
         $tindakanPokok->each(function ($tindakan) {
             // Group laporan by user_id
             $tindakan->grouped_laporan = $tindakan->laporanTindakan->groupBy('user_id');
-            
+
             // Calculate total jam untuk semua laporan tindakan ini
             $tindakan->total_jam_tindakan = $tindakan->laporanTindakan->sum(function ($laporan) {
                 $mulai = \Carbon\Carbon::parse($laporan->jam_mulai);
                 $berhenti = \Carbon\Carbon::parse($laporan->jam_berhenti);
                 return $mulai->floatDiffInHours($berhenti);
             });
-            
+
             // Calculate total jam per user
             $tindakan->jam_per_user = $tindakan->grouped_laporan->map(function ($laporanGroup) {
                 return $laporanGroup->sum(function ($laporan) {
@@ -89,12 +89,12 @@ class LaporanController extends Controller
                     return $mulai->floatDiffInHours($berhenti);
                 });
             });
-            
+
             // Calculate frekuensi per user
             $tindakan->frekuensi_per_user = $tindakan->grouped_laporan->map(function ($laporanGroup) {
                 return $laporanGroup->count();
             });
-            
+
             // Calculate SWL
             $totalCount = $tindakan->laporanTindakan->count();
             $tindakan->swl = $totalCount > 0 ? ($tindakan->total_jam_tindakan / $totalCount) : 0;

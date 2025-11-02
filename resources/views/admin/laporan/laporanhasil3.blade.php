@@ -50,11 +50,11 @@
                             @php
                                 $totalWaktu = 0;
                                 // if($tindakan->satuan == 'jam') {
-                                //     $totalWaktu = $tindakan->waktu * 1; 
+                                //     $totalWaktu = $tindakan->waktu * 1;
                                 // } elseif($tindakan->satuan == 'menit') {
-                                //     $totalWaktu = $tindakan->waktu / 60; 
+                                //     $totalWaktu = $tindakan->waktu / 60;
                                 // } elseif($tindakan->satuan == 'hari') {
-                                //     $totalWaktu = $tindakan->waktu * 24; 
+                                //     $totalWaktu = $tindakan->waktu * 24;
                                 // }
                                 if ($tindakan->kategori == 'harian') {
                                     $totalWaktu = $totalWaktu * 264; // 264 hari kerja dalam setahun
@@ -109,9 +109,9 @@
                 @foreach($tindakanPenunjang as $tindakan)
                     @if( isset($tindakan->waktu) && $tindakan->waktu > 0 && !array_key_exists($tindakan->id, $totalTindakan))
                         @continue <!-- Lewati tindakan dengan waktu 0 -->
-                    @else   
+                    @else
                         @php
-                            
+
                             $jamTersediaPerTahun = $hospitalTime; // Total jam kerja per tahun
                             $rataWaktu = $tindakan->waktu > 0 ? ($tindakan->waktu / $tindakan->count()) : 0;
                             $swl = $rataWaktu > 0 ? $jamTersediaPerTahun / ($rataWaktu / 60) : 0;

@@ -273,11 +273,11 @@
                                                         </div>
                                                         <div style="width: 150px;">
                                                             <label class="form-label">Jam Mulai</label>
-                                                            <input type="time" class="form-control" name="jam_mulai[]" required>
+                                                            <input type="time" style="border: 1px solid #ccc;" class="form-control" name="jam_mulai[]" required>
                                                         </div>
                                                         <div style="width: 150px;">
                                                             <label class="form-label">Jam Berhenti</label>
-                                                            <input type="time" class="form-control" name="jam_berhenti[]" required>
+                                                            <input type="time" style="border: 1px solid #ccc;" class="form-control" name="jam_berhenti[]" required>
                                                         </div>
                                                     </div>
                                                 </div>
