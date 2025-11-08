@@ -463,6 +463,38 @@
 
                 const toggleButton = document.getElementById("toggleButton");
                 const nextButton   = document.getElementById("nextButton");
+                // Default: hide Next until needed
+                nextButton.style.display = "none";
+
+                // Update buttons depending on step count and position
+                function updateControlsForStep() {
+                    if (tindakanList.length <= 1) {
+                        // Single tindakan: only Start/Stop toggle button
+                        toggleButton.style.display = "";
+                        nextButton.style.display = "none";
+                        toggleButton.disabled = false;
+                        toggleButton.textContent = isRunning ? "Stop" : "Start";
+                        return;
+                    }
+                    // Multi-step
+                    if (!isRunning) {
+                        // Before starting
+                        toggleButton.style.display = "";
+                        toggleButton.disabled = false;
+                        toggleButton.textContent = "Start";
+                        nextButton.style.display = "none";
+                    } else {
+                        // Running: hide Start, show Next or Stop
+                        toggleButton.style.display = "none";
+                        nextButton.style.display = "";
+                        nextButton.disabled = false;
+                        if (currentStep === tindakanList.length - 1) {
+                            nextButton.textContent = "Stop";
+                        } else {
+                            nextButton.textContent = "Next";
+                        }
+                    }
+                }
 
                 function startTimer() {
                     setFormDisabled(true);
@@ -480,6 +512,7 @@
                         const seconds = String(elapsedTime % 60).padStart(2, "0");
                         timerText.textContent = `${minutes}:${seconds}`;
                     }, 1000);
+                    updateControlsForStep();
                 }
 
                 function stopTimer() {
@@ -500,17 +533,64 @@
                     }
 
                     if (!isRunning) {
-                        // START batch
+                        // START
                         currentStep = 0;
                         startTimer();
-                        isRunning = true;
-                        toggleButton.textContent = "Stop";
-                        nextButton.disabled = false;
+                        updateControlsForStep();
                     } else {
-                        // STOP batch
-                        stopTimer();
-                        toggleButton.textContent = "Start";
-                        nextButton.disabled = true;
+                        // STOP only for single tindakan via toggleButton
+                        if (tindakanList.length <= 1) {
+                            const tindakanId = tindakanList[0];
+                            const shiftIdStop = document.getElementById("shiftId").value;
+                            const keterangan = document.querySelector("#formTimer input[name='keterangan']").value;
+                            const namaPasien = document.querySelector("#formTimer input[name='nama_pasien']").value;
+                            const jamMulai = startTime.toLocaleString("sv-SE", { timeZone: "Asia/Jakarta" }).replace(" ", "T");
+                            const jamBerhenti = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Jakarta" }).replace(" ", "T");
+                            const durasi = Math.floor((new Date(jamBerhenti) - new Date(jamMulai)) / 1000);
+                            stopTimer();
+                            fetch("/perawat/stop-action", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "X-CSRF-TOKEN": document.querySelector("meta[name='csrf-token']").content,
+                                },
+                                body: JSON.stringify({
+                                    tindakan_id: tindakanId,
+                                    shift_id: shiftIdStop,
+                                    jam_mulai: jamMulai,
+                                    jam_berhenti: jamBerhenti,
+                                    keterangan: keterangan ?? null,
+                                    nama_pasien: namaPasien ?? null
+                                }),
+                            })
+                            .then(r => r.json())
+                            .then(data => {
+                                if (data.status === "success") {
+                                    alert(`Tindakan selesai. Durasi: ${data.durasi} detik`);
+                                } else {
+                                    alert("Gagal menyimpan data.");
+                                }
+                            })
+                            .catch(err => console.error(err))
+                            .finally(() => {
+                                toggleButton.textContent = "Start";
+                                setFormDisabled(false);
+                                // Reset fields and UI
+                                $("#tindakanSelect").val(null).trigger("change");
+                                orderedValues = [];
+                                tindakanList = [];
+                                currentStep = 0;
+                                document.querySelector("#formTimer input[name='keterangan']").value = "";
+                                document.querySelector("#formTimer input[name='nama_pasien']").value = "";
+                                currentTindakanEl.textContent = " - ";
+                                timerText.textContent = "00:00";
+                                progressCircle.style.strokeDashoffset = circleLength;
+                                nextButton.style.display = "none";
+                                toggleButton.style.display = "";
+                                isRunning = false;
+                                updateControlsForStep();
+                            });
+                        }
                     }
                 });
 
@@ -559,14 +639,27 @@
                     currentStep++;
                     if (currentStep < tindakanList.length) {
                         stopTimer();
-                        startTimer(); // auto restart
+                        startTimer(); // auto restart for next tindakan
+                        updateControlsForStep();
                     } else {
+                        // selesai
                         stopTimer();
-                        toggleButton.textContent = "Start";
-                        nextButton.disabled = true;
-                        currentTindakanEl.textContent = "✅ Semua tindakan selesai";
                         setFormDisabled(false);
                         isRunning = false;
+                        // Reset fields and UI
+                        $("#tindakanSelect").val(null).trigger("change");
+                        orderedValues = [];
+                        tindakanList = [];
+                        currentStep = 0;
+                        document.querySelector("#formTimer input[name='keterangan']").value = "";
+                        document.querySelector("#formTimer input[name='nama_pasien']").value = "";
+                        currentTindakanEl.textContent = " - ";
+                        timerText.textContent = "00:00";
+                        progressCircle.style.strokeDashoffset = circleLength;
+                        nextButton.style.display = "none";
+                        toggleButton.style.display = "";
+                        toggleButton.disabled = false;
+                        toggleButton.textContent = "Start";
                     }
                 });
 

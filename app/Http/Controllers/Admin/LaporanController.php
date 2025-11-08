@@ -326,7 +326,7 @@ class LaporanController extends Controller
         // Optimized version
         $laporan = LaporanTindakanPerawat::with('tindakan:id,tindakan,status') // Specify columns
             ->when($selectedUserId, fn ($query) => $query->where('user_id', $selectedUserId))
-            ->select('id', 'tindakan_id', 'user_id', 'tanggal', 'durasi', 'keterangan', 'nama_pasien') // Select only needed columns
+            ->select('id', 'tindakan_id', 'user_id', 'tanggal', 'durasi', 'keterangan', 'nama_pasien', 'jam_mulai', 'jam_berhenti') // Select only needed columns
             ->latest('id') // Add ordering
             ->get();
 
